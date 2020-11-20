@@ -1,0 +1,25 @@
+[package]
+name = "kinggiveaway"
+version = "0.1.0"
+authors = ["kingbri <bdashore3@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio  = { version = "0.2", features = ["macros", "time"] }
+tracing-subscriber = "0.2.15"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "0.8.1", features = ["v4"] }
+
+[dependencies.serenity]
+git = "https://github.com/serenity-rs/serenity"
+branch = "current"
+default-features = true
+features = ["model", "native_tls_backend"]
+
+[dependencies.sqlx]
+version = "0.4.0-beta.1"
+default-features = false
+features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "offline"]
