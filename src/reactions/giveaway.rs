@@ -1,14 +1,11 @@
-use serenity::{
-    framework::standard::{macros::command, Args, CommandResult},
-    model::prelude::*,
-    prelude::*,
-};
-use sqlx::*;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serenity::{framework::standard::CommandResult, model::prelude::*, prelude::*};
 use uuid::Uuid;
 
 use crate::structures::cmd_data::ConnectionPool;
 
-pub async fn add_giveaway_entry(ctx: &Context, reaction: &Reaction) -> CommandResult {
+pub async fn add_giveaway_entries(ctx: &Context, reaction: &Reaction) -> CommandResult {
     let pool = ctx
         .data
         .read()
@@ -17,47 +14,66 @@ pub async fn add_giveaway_entry(ctx: &Context, reaction: &Reaction) -> CommandRe
         .cloned()
         .unwrap();
 
-    let check = sqlx::query!(
-        "SELECT EXISTS(SELECT 1 FROM info WHERE message_id = $1)",
+    let giveaway_data = sqlx::query!(
+        "SELECT pre_expiry FROM info WHERE message_id = $1",
         reaction.message_id.0 as i64
     )
-    .fetch_one(&pool)
+    .fetch_optional(&pool)
     .await?;
 
-    if !check.exists.unwrap() {
-        println!("Doesn't exist!");
-        return Ok(());
-    }
+    match giveaway_data {
+        Some(giveaway_data) => {
+            let current_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards?")
+                .as_secs();
 
-    println!("Exists in db!");
+            if current_time > giveaway_data.pre_expiry as u64 {
+                return Ok(());
+            }
+        }
+        None => return Ok(()),
+    }
 
     let guild = ctx.cache.guild(reaction.guild_id.unwrap()).await.unwrap();
     let user_id = reaction.user_id.unwrap();
+
+    // Bias role ID
     let noble_id = RoleId::from(779011688132771921);
 
     let member = guild.member(ctx, user_id).await?;
 
     if member.roles.contains(&noble_id) {
         sqlx::query!(
-            "INSERT INTO entries VALUES($1, $2)",
+            "INSERT INTO entries VALUES($1, $2, $3)",
             Uuid::new_v4(),
-            user_id.0 as i64
+            user_id.0 as i64,
+            reaction.message_id.0 as i64
         )
         .execute(&pool)
         .await?;
     }
 
     sqlx::query!(
-        "INSERT INTO entries VALUES($1, $2)",
+        "INSERT INTO entries VALUES($1, $2, $3)",
         Uuid::new_v4(),
-        user_id.0 as i64
+        user_id.0 as i64,
+        reaction.message_id.0 as i64
     )
     .execute(&pool)
     .await?;
 
-    Ok(())
-}
+    // Entry dump channel id
+    let dump_id = ChannelId::from(779851330080342016);
 
-pub async fn remove_giveaway_entry(ctx: &Context, reaction: &Reaction) -> CommandResult {
+    dump_id
+        .say(
+            ctx,
+            format!("{} has entered the giveaway", user_id.mention()),
+        )
+        .await?;
+
+    println!("Sucessfully added entry/ies!");
+
     Ok(())
 }

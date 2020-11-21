@@ -3,9 +3,9 @@ mod helpers;
 mod reactions;
 mod structures;
 
-use std::{collections::HashSet, env};
+use std::{collections::HashSet, env, sync::atomic::AtomicBool, sync::atomic::Ordering};
 
-use helpers::database_helper;
+use helpers::{database_helper, giveaway_helper};
 use reactions::reaction_handler;
 use serenity::{
     async_trait,
@@ -17,18 +17,31 @@ use serenity::{
     http::Http,
     model::channel::Message,
     model::channel::Reaction,
-    model::prelude::Ready,
-    Client,
+    model::id::GuildId,
+    model::{
+        guild::Member,
+        prelude::{Ready, User},
+    },
 };
 use structures::{cmd_data::*, commands::*};
 
 // Event handler for when the bot starts
-struct Handler;
+struct Handler {
+    run_loop: AtomicBool,
+}
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("Connected as {}", ready.user.name);
+    }
+
+    async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
+        if self.run_loop.load(Ordering::Relaxed) {
+            self.run_loop.store(false, Ordering::Relaxed);
+
+            let _ = database_helper::restore_tasks(ctx).await;
+        }
     }
 
     async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
@@ -38,6 +51,16 @@ impl EventHandler for Handler {
 
     async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
         let _ = reaction_handler::dispatch_reaction(&ctx, &reaction, true).await;
+    }
+
+    async fn guild_member_removal(
+        &self,
+        ctx: Context,
+        _guild_id: GuildId,
+        user: User,
+        _member_data_if_available: Option<Member>,
+    ) {
+        let _ = giveaway_helper::remove_giveaway_entries(&ctx, &user.id).await;
     }
 }
 
@@ -95,7 +118,9 @@ async fn main() -> CommandResult {
 
     let mut client = ClientBuilder::new(&token)
         .framework(framework)
-        .event_handler(Handler)
+        .event_handler(Handler {
+            run_loop: AtomicBool::new(true),
+        })
         .intents({
             let mut intents = GatewayIntents::all();
             intents.remove(GatewayIntents::DIRECT_MESSAGES);

@@ -4,7 +4,7 @@ use serenity::{
     model::channel::{Reaction, ReactionType},
 };
 
-use crate::reactions::giveaway;
+use crate::{helpers::giveaway_helper, reactions::giveaway};
 
 pub async fn dispatch_reaction(ctx: &Context, reaction: &Reaction, _remove: bool) -> CommandResult {
     if reaction.user(&ctx).await.unwrap().bot {
@@ -15,9 +15,11 @@ pub async fn dispatch_reaction(ctx: &Context, reaction: &Reaction, _remove: bool
         match name.as_str() {
             "🎉" => {
                 if _remove {
-                    giveaway::add_giveaway_entry(ctx, reaction).await?;
+                    let user_id = reaction.user_id.unwrap();
+
+                    giveaway_helper::remove_giveaway_entries(ctx, &user_id).await?;
                 } else {
-                    giveaway::remove_giveaway_entry(ctx, reaction).await?;
+                    giveaway::add_giveaway_entries(ctx, reaction).await?;
                 }
             }
             _ => {}

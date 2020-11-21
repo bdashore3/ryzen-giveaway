@@ -1,16 +1,18 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serenity::{
-    framework::standard::{macros::command, Args, CommandResult},
+    framework::standard::{macros::command, CommandResult},
     model::prelude::*,
     prelude::*,
 };
+use tokio::time::delay_for;
 
-use crate::structures::cmd_data::ConnectionPool;
+use crate::{helpers::giveaway_helper, structures::cmd_data::ConnectionPool};
 
 #[command]
 #[owners_only]
-async fn setup(ctx: &Context, msg: &Message) -> CommandResult {
+async fn setup(ctx: &Context, _msg: &Message) -> CommandResult {
+    // Giveaway channel id
     let channel_id = ChannelId::from(779011629710311424);
 
     let giveaway_text = concat!(
@@ -30,24 +32,43 @@ async fn setup(ctx: &Context, msg: &Message) -> CommandResult {
     let current_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards?")
-        .as_secs() as i64;
+        .as_secs();
+
+    let lock_delay = 518400;
+    let end_delay = 604800;
+
+    let giveaway_msg = channel_id.say(ctx, giveaway_text).await?;
 
     sqlx::query!(
-        "INSERT INTO info VALUES($1, $2, $3)",
-        msg.id.0 as i64,
-        current_time + 518400,
-        current_time + 604800
+        "INSERT INTO info VALUES($1, $2, $3, $4)",
+        giveaway_msg.id.0 as i64,
+        giveaway_msg.channel_id.0 as i64,
+        (lock_delay + current_time) as i64,
+        (end_delay + current_time) as i64
     )
     .execute(&pool)
     .await?;
 
-    let giveaway_msg = channel_id.say(ctx, giveaway_text).await?;
-
     let emoji = ReactionType::Unicode("🎉".to_string());
+
+    // Entry dump channel id
+    let dump_id = ChannelId::from(779851330080342016);
+
+    dump_id
+        .say(ctx, "New Givewaway \n-------------------------------------")
+        .await?;
 
     giveaway_msg.react(ctx, emoji).await?;
 
-    //TODO: Add spawn function to start the delay for giveaway locking and giveaway ending
+    let ctx_clone = ctx.clone();
+    let giveaway_msg_clone = giveaway_msg.clone();
+    tokio::spawn(async move {
+        delay_for(Duration::from_secs(lock_delay)).await;
+        let _ = giveaway_helper::lock_giveaway(&ctx_clone, &giveaway_msg_clone).await;
+
+        delay_for(Duration::from_secs(end_delay - lock_delay)).await;
+        let _ = giveaway_helper::choose_winner(&ctx_clone, &giveaway_msg_clone).await;
+    });
 
     Ok(())
 }
