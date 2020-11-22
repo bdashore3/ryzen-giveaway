@@ -12,8 +12,9 @@ use crate::{helpers::giveaway_helper, structures::cmd_data::ConnectionPool};
 #[command]
 #[owners_only]
 async fn setup(ctx: &Context, _msg: &Message) -> CommandResult {
+    println!("Executing command!");
     // Giveaway channel id
-    let channel_id = ChannelId::from(779011629710311424);
+    let channel_id = ChannelId::from(775359578070188064);
 
     let giveaway_text = concat!(
         "Hi there! Welcome to the giveaway! \n",
@@ -52,10 +53,10 @@ async fn setup(ctx: &Context, _msg: &Message) -> CommandResult {
     let emoji = ReactionType::Unicode("🎉".to_string());
 
     // Entry dump channel id
-    let dump_id = ChannelId::from(779851330080342016);
+    let dump_id = ChannelId::from(779858404290068541);
 
     dump_id
-        .say(ctx, "New Givewaway \n-------------------------------------")
+        .say(ctx, "New Giveaway \n-------------------------------------")
         .await?;
 
     giveaway_msg.react(ctx, emoji).await?;

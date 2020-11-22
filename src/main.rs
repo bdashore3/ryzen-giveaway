@@ -11,7 +11,7 @@ use serenity::{
     async_trait,
     client::{bridge::gateway::GatewayIntents, ClientBuilder, Context, EventHandler},
     framework::{
-        standard::{macros::hook, CommandError, CommandResult},
+        standard::{macros::hook, CommandError, CommandResult, DispatchError},
         StandardFramework,
     },
     http::Http,
@@ -86,28 +86,31 @@ async fn main() -> CommandResult {
 
     let pool = database_helper::obtain_db_pool(&creds.db_connection).await?;
 
-    // After a command is executed, goto here
     #[hook]
-    async fn after(ctx: &Context, msg: &Message, cmd_name: &str, error: Result<(), CommandError>) {
-        if let Err(why) = error {
-            let part_1 = "Looks like the bot encountered an error! \n";
-            let part_2 =
-                "Please use the `support` command and send the output to the support server!";
-            let error_string = format!("{}{}", part_1, part_2);
+    async fn dispatch_error_hook(ctx: &Context, msg: &Message, error: DispatchError) {
+        match error {
+            DispatchError::OnlyForOwners => {
+                let _ = msg
+                    .channel_id
+                    .say(
+                        ctx,
+                        "You're not the owner of this bot! You can't create this giveaway!",
+                    )
+                    .await;
+            }
+            _ => {}
+        }
+    }
 
-            let _ = msg
-                .channel_id
-                .send_message(ctx, |m| {
-                    m.embed(|e| {
-                        e.color(0xff69b4);
-                        e.title("Aw Snap!");
-                        e.description(error_string);
-                        e.field("Command Name", cmd_name, false);
-                        e.field("Error", format!("```{} \n```", why), false);
-                        e
-                    })
-                })
-                .await;
+    #[hook]
+    async fn after(
+        _ctx: &Context,
+        _msg: &Message,
+        cmd_name: &str,
+        error: Result<(), CommandError>,
+    ) {
+        if let Err(why) = error {
+            println!("There was an error in command {}: {}", cmd_name, why)
         }
     }
 

@@ -39,7 +39,7 @@ pub async fn add_giveaway_entries(ctx: &Context, reaction: &Reaction) -> Command
     let user_id = reaction.user_id.unwrap();
 
     // Bias role ID
-    let noble_id = RoleId::from(779011688132771921);
+    let noble_id = RoleId::from(554090254664073237);
 
     let member = guild.member(ctx, user_id).await?;
 
@@ -64,7 +64,7 @@ pub async fn add_giveaway_entries(ctx: &Context, reaction: &Reaction) -> Command
     .await?;
 
     // Entry dump channel id
-    let dump_id = ChannelId::from(779851330080342016);
+    let dump_id = ChannelId::from(779858404290068541);
 
     dump_id
         .say(

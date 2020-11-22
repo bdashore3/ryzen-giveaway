@@ -84,7 +84,7 @@ pub async fn remove_giveaway_entries(ctx: &Context, user_id: &UserId) -> Command
 
     if check.exists.unwrap() {
         // Entry dump channel id
-        let dump_id = ChannelId::from(779851330080342016);
+        let dump_id = ChannelId::from(779858404290068541);
 
         dump_id
             .say(ctx, format!("{} has left the giveaway", user_id.mention()))
